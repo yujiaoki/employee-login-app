@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 
+const API_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+
 function App() {
   const [empId, setEmpId] = useState('');
   const [stats, setStats] = useState([]); // DBから取得したデータを格納する変数
 
   // 【関数A】最新の統計データをバックエンドから取ってくる処理
+  // fetch の部分を書き換え
   const fetchStats = () => {
-    fetch('http://localhost:8000/stats')
+    fetch(`${API_URL}/stats`) // localhost ではなく API_URL を使う
       .then(res => res.json())
-      .then(data => setStats(data)); // アロー関数で取得データをstatsに格納
+      .then(data => setStats(data));
   };
 
   // 画面が最初に表示された時に一度だけ実行
@@ -17,14 +20,14 @@ function App() {
   }, []);
 
   // 【関数B】ログインボタンを押した時の処理
+
   const handleLogin = () => {
     if (!empId) return;
-    
-    fetch(`http://localhost:8000/login/${empId}`, { method: 'POST' })
+    fetch(`${API_URL}/login/${empId}`, { method: 'POST' }) // ここも
       .then(res => res.json())
       .then(() => {
-        setEmpId('');    // 入力欄を空にする
-        fetchStats();    // ★重要：ログインが終わったら、すぐに最新リストを再取得する！
+        setEmpId('');
+        fetchStats();
       });
   };
 

@@ -5,11 +5,21 @@ import os
 
 app = FastAPI()
 
-# フロントエンドからのアクセスを許可する設定 (CORS)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# --- CORSの設定を追加 ---
+# これを入れないと、ブラウザが「知らないURL（Renderのフロント）からの通信」を拒否します
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # 本番ではフロントのURLに絞るのが理想ですが、まずは"*"で全て許可
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def get_db_conn():
-    return psycopg2.connect(os.environ.get("DATABASE_URL"))
+    # Renderのデータベース設定画面で取得できるURLを環境変数から読み込むようにします
+    # なければローカルのDBに繋ぎます
+    database_url = os.environ.get("DATABASE_URL", "postgresql://user:password@db:5432/app_db")
+    return psycopg2.connect(database_url)
 
 @app.get("/")
 def read_root():
@@ -43,3 +53,9 @@ def get_stats():
     
     # フロントエンドが扱いやすい「辞書のリスト」形式で返す
     return [{"id": row[0], "count": row[1]} for row in rows]
+
+if __name__ == "__main__":
+    import uvicorn
+    # Renderはポート番号を環境変数 PORT で指定してくるため、それに合わせます
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
