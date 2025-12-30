@@ -1,0 +1,12 @@
+# Node.js (Frontend)
+node_modules/
+npm-debug.log
+
+# Python (Backend)
+__pycache__/
+*.py[cod]
+.venv/
+
+# Docker/OS
+.DS_Store
+postgres_data/
