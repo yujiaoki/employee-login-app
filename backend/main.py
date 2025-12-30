@@ -26,3 +26,20 @@ def login(emp_id: str):
     cur.close()
     conn.close()
     return {"message": f"{emp_id} logged in!"}
+
+@app.get("/stats")
+def get_stats():
+    conn = get_db_conn()
+    cur = conn.cursor()
+    # テーブルがなければ作成（念のため）
+    cur.execute("CREATE TABLE IF NOT EXISTS logins (id TEXT PRIMARY KEY, count INTEGER);")
+    
+    # ログイン回数が多い順（DESC）に全件取得
+    cur.execute("SELECT id, count FROM logins ORDER BY count DESC;")
+    rows = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    
+    # フロントエンドが扱いやすい「辞書のリスト」形式で返す
+    return [{"id": row[0], "count": row[1]} for row in rows]
