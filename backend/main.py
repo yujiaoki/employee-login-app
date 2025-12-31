@@ -1,61 +1,92 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import psycopg2
 import os
+from datetime import datetime
+from typing import List
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from pydantic import BaseModel
 
+# 1. データベース設定
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# 2. モデル定義（テーブルの設計図）
+class ShoppingItem(Base):
+    __tablename__ = "shopping_items"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    is_bought = Column(Boolean, default=False)  # 購入済みならTrue
+    created_at = Column(DateTime, default=datetime.now)
+
+# テーブルの作成
+Base.metadata.create_all(bind=engine)
+
+# 3. FastAPIの初期化
 app = FastAPI()
 
-# --- CORSの設定を追加 ---
-# これを入れないと、ブラウザが「知らないURL（Renderのフロント）からの通信」を拒否します
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # 本番ではフロントのURLに絞るのが理想ですが、まずは"*"で全て許可
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-def get_db_conn():
-    # Renderのデータベース設定画面で取得できるURLを環境変数から読み込むようにします
-    # なければローカルのDBに繋ぎます
-    database_url = os.environ.get("DATABASE_URL", "postgresql://user:password@db:5432/app_db")
-    return psycopg2.connect(database_url)
+# DBセッション管理
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-@app.get("/")
-def read_root():
-    return {"status": "ok"}
+# 4. Pydanticモデル（データのやり取り用）
+class ItemCreate(BaseModel):
+    title: str
 
-@app.post("/login/{emp_id}")
-def login(emp_id: str):
-    conn = get_db_conn()
-    cur = conn.cursor()
-    # テーブルがなければ作成、あれば回数を+1（競プロ的な更新処理）
-    cur.execute("CREATE TABLE IF NOT EXISTS logins (id TEXT PRIMARY KEY, count INTEGER);")
-    cur.execute("INSERT INTO logins (id, count) VALUES (%s, 1) ON CONFLICT (id) DO UPDATE SET count = logins.count + 1;", (emp_id,))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return {"message": f"{emp_id} logged in!"}
+class ItemResponse(BaseModel):
+    id: int
+    title: str
+    is_bought: bool
+    created_at: datetime
+    class Config:
+        from_attributes = True
 
-@app.get("/stats")
-def get_stats():
-    conn = get_db_conn()
-    cur = conn.cursor()
-    # テーブルがなければ作成（念のため）
-    cur.execute("CREATE TABLE IF NOT EXISTS logins (id TEXT PRIMARY KEY, count INTEGER);")
-    
-    # ログイン回数が多い順（DESC）に全件取得
-    cur.execute("SELECT id, count FROM logins ORDER BY count DESC;")
-    rows = cur.fetchall()
-    
-    cur.close()
-    conn.close()
-    
-    # フロントエンドが扱いやすい「辞書のリスト」形式で返す
-    return [{"id": row[0], "count": row[1]} for row in rows]
+# 5. APIエンドポイント（機能）
+
+# アイテム一覧を取得（未購入のみ）
+@app.get("/items", response_model=List[ItemResponse])
+def read_items(db: Session = Depends(get_db)):
+    return db.query(ShoppingItem).filter(ShoppingItem.is_bought == False).order_by(ShoppingItem.created_at.desc()).all()
+
+# アイテムを追加
+@app.post("/items", response_model=ItemResponse)
+def create_item(item: ItemCreate, db: Session = Depends(get_db)):
+    db_item = ShoppingItem(title=item.title)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+# 購入済みに更新（完了ボタン用）
+@app.patch("/items/{item_id}", response_model=ItemResponse)
+def buy_item(item_id: int, db: Session = Depends(get_db)):
+    db_item = db.query(ShoppingItem).filter(ShoppingItem.id == item_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    db_item.is_bought = True
+    db.commit()
+    db.refresh(db_item)
+    return db_item
 
 if __name__ == "__main__":
     import uvicorn
-    # Renderはポート番号を環境変数 PORT で指定してくるため、それに合わせます
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
