@@ -72,8 +72,18 @@ function App() {
             style={{ width: '120px', height: 'auto', borderRadius: '10px' }} 
           />
           <h1 style={{ fontSize: '22px', margin: '10px 0', color: '#8D6E63' }}>
-            🐻 裕嗣＆菜奈子の買い物リスト 🍯
+            🐻 こぐまの買い物リスト 🍯
           </h1>
+          {/* ★ ここにお二人の名前を小さく追加 ★ */}
+          {/* ★ ここにお二人の名前を小さく追加 ★ */}
+          <div style={{ 
+            fontSize: '14px', 
+            marginTop: '5px', 
+            color: '#A1887F', // 少し薄めのブラウンで控えめに
+            letterSpacing: '0.05em'
+          }}>
+            For 裕嗣 ＆ 菜奈子
+          </div>
         </div>
 
         {/* 入力フォーム（以下、先ほどと同じ） */}
