@@ -72,7 +72,7 @@ function App() {
             style={{ width: '120px', height: 'auto', borderRadius: '10px' }} 
           />
           <h1 style={{ fontSize: '22px', margin: '10px 0', color: '#8D6E63' }}>
-            🐻 こぐまの買い物リスト 🍯
+            🐻 裕嗣＆菜奈子の買い物リスト 🍯
           </h1>
         </div>
 
